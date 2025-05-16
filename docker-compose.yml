@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  postgres-db:
+    image: postgres:15
+    container_name: exchange-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: exchange_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - exchange_postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql  # Ejecuta todos los .sql en esta carpeta al iniciar
+    networks:
+      - exchange-network
+
+  backend-app:
+    container_name: exchange-backend
+    build:
+      context: ../bbva-currency-exchange-api  # Ruta relativa al Dockerfile del backend
+    ports:
+      - "4040:4040"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_R2DBC_URL=r2dbc:postgresql://postgres-db:5432/exchange_db
+      - SPRING_R2DBC_USERNAME=postgres
+      - SPRING_R2DBC_PASSWORD=postgres
+    depends_on:
+      - postgres-db
+    networks:
+      - exchange-network
+
+  frontend-app:
+    container_name: exchange-frontend
+    build:
+      context: ../bbva-currency-exchange-front
+    ports:
+      - "8080:80"
+    environment:
+      - VITE_API_URL=http://localhost:4040  # O ajusta según cómo lo consuma tu frontend
+    depends_on:
+      - backend-app
+    networks:
+      - exchange-network
+
+volumes:
+  exchange_postgres_data:
+
+networks:
+  exchange-network:
+    driver: bridge
